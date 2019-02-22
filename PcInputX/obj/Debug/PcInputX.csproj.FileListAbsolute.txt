@@ -4,3 +4,9 @@ C:\Users\Arvind\Documents\Visual Studio 2017\Projects\PcInputLogger\PcInputX\obj
 C:\Users\Arvind\Documents\Visual Studio 2017\Projects\PcInputLogger\PcInputX\obj\Debug\PcInputX.dll
 C:\Users\Arvind\Documents\Visual Studio 2017\Projects\PcInputLogger\PcInputX\obj\Debug\PcInputX.pdb
 C:\Users\Arvind\Documents\Visual Studio 2017\Projects\PcInputLogger\PcInputX\obj\Debug\PcInputX.csprojResolveAssemblyReference.cache
+C:\!projects\PcInputLogger\PcInputX\bin\Debug\PcInputX.dll
+C:\!projects\PcInputLogger\PcInputX\bin\Debug\PcInputX.pdb
+C:\!projects\PcInputLogger\PcInputX\obj\Debug\PcInputX.csprojAssemblyReference.cache
+C:\!projects\PcInputLogger\PcInputX\obj\Debug\PcInputX.csproj.CoreCompileInputs.cache
+C:\!projects\PcInputLogger\PcInputX\obj\Debug\PcInputX.dll
+C:\!projects\PcInputLogger\PcInputX\obj\Debug\PcInputX.pdb

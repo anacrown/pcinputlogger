@@ -22,7 +22,7 @@ namespace PcInputX
             Time = lParam.time
         };
 
-        public override string ToString() => $"{EventType} {EventFlags} {Time} {Key}";
+        public override string ToString() => $"{EventType} {EventFlags} {Time} {Key} ({KeyCode})";
 
         public override TEvent ToTransferData() => new TKeyboard
         {
@@ -31,6 +31,8 @@ namespace PcInputX
             KeyName = Key.ToString(),
             KeyCode = KeyCode
         };
+
+        public override void InjectNow() => KeyboardX.InjectNow(this); 
 
         public override void Inject(DateTime starTime) => KeyboardX.Inject(this, starTime);
 
@@ -65,6 +67,15 @@ namespace PcInputX
         [DllImport("user32.dll")]
         private static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, int dwExtraInfo);
 
+        [DllImport("user32.dll", CharSet = CharSet.Auto, ExactSpelling = true, CallingConvention = CallingConvention.Winapi)]
+        private static extern short GetKeyState(int keyCode);
+
+        public static bool IsHooked { get; private set; } = false;
+
+        public static bool IsNumLockEnabled => (((ushort)GetKeyState((int)Keys.NumLock)) & 0xffff) != 0;
+        public static bool IsCapsLockEnabled => (((ushort)GetKeyState((int)Keys.CapsLock)) & 0xffff) != 0;
+        public static bool IsScrollLockEnabled => (((ushort)GetKeyState((int)Keys.Scroll)) & 0xffff) != 0;
+
         [StructLayout(LayoutKind.Sequential)]
         public class Kbdllhookstruct
         {
@@ -86,14 +97,33 @@ namespace PcInputX
 
         public static void Hook()
         {
+            if (IsHooked) return;
+
             using (var process = Process.GetCurrentProcess())
             using (var module = process.MainModule)
                 _mHook = SetWindowsHookEx(HookType.WH_KEYBOARD_LL, LowLevelKeyboardProcDelegate, GetModuleHandle(module.ModuleName), 0);
+
+            IsHooked = true;
         }
 
         public static void UnHook()
         {
+            if (!IsHooked) return;
+
             UnhookWindowsHookEx(_mHook);
+
+            IsHooked = false;
+        }
+
+        public static void InjectNow(KeyboardXEvent xEvent)
+        {
+            Console.WriteLine(xEvent);
+
+            uint dwFlags = 0;
+            if (xEvent.EventType == WM.KEYUP || xEvent.EventType == WM.SYSKEYUP)
+                dwFlags = 0x0002;
+
+            keybd_event((byte)xEvent.KeyCode, 0, dwFlags, 0);
         }
 
         public static void Inject(KeyboardXEvent xEvent, DateTime starTime)
@@ -103,13 +133,7 @@ namespace PcInputX
             if (sleep > 0)
                 Thread.Sleep(sleep);
 
-            Console.WriteLine(xEvent);
-
-            uint dwFlags = 0;
-            if (xEvent.EventType == WM.KEYUP || xEvent.EventType == WM.SYSKEYUP)
-                dwFlags = 0x0002;
-
-            keybd_event((byte) xEvent.KeyCode, 0, dwFlags, 0);
+            InjectNow(xEvent);
         }
 
         private static IntPtr KeyboardProc(int nCode, WM wParam, IntPtr lParam)
@@ -123,7 +147,7 @@ namespace PcInputX
 
             KeyboardEvent?.Invoke(null, keyboardXEvent);
 
-            var res = keyboardXEvent.StopEventPropagation ? new IntPtr(1) : CallNextHookEx(nCode, nCode, (IntPtr) wParam, lParam);
+            var res = keyboardXEvent.StopEventPropagation ? new IntPtr(1) : CallNextHookEx(nCode, nCode, (IntPtr)wParam, lParam);
 
 #if DEBUG
             Console.WriteLine($@"Raise AfterKeyboardEvent {keyboardXEvent}");

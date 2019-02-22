@@ -34,6 +34,8 @@ namespace PcInputX
             Y = Y
         };
 
+        public override void InjectNow() => MouseX.InjectNow(this); 
+
         public override void Inject(DateTime starTime) => MouseX.Inject(this, starTime);
 
         public static MouseXEvent FromTransferData(TMouse tMouse) => new MouseXEvent
@@ -125,6 +127,16 @@ namespace PcInputX
             UnhookWindowsHookEx(_mHook);
         }
 
+        public static void InjectNow(MouseXEvent xEvent)
+        {
+            Console.WriteLine(xEvent);
+
+            var dwFlags = WMToEventF(xEvent.EventType);
+
+            SetCursorPos(xEvent.X, xEvent.Y);
+            mouse_event(dwFlags, 0, 0, xEvent.Delta, UIntPtr.Zero);
+        }
+
         public static void Inject(MouseXEvent xEvent, DateTime starTime)
         {
             var sleep = xEvent.Time - (int)(DateTime.Now - starTime).TotalMilliseconds;
@@ -132,12 +144,7 @@ namespace PcInputX
             if (sleep > 0)
                 Thread.Sleep(sleep);
 
-            Console.WriteLine(xEvent);
-
-            var dwFlags = WMToEventF(xEvent.EventType);
-
-            SetCursorPos(xEvent.X, xEvent.Y);
-            mouse_event(dwFlags, 0, 0, xEvent.Delta, UIntPtr.Zero);
+            InjectNow(xEvent);
         }
 
         private static MOUSEEVENTF WMToEventF(WM wParam)

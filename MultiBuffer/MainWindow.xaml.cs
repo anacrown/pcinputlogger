@@ -2,9 +2,11 @@
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.IO;
+using System.Linq;
 using System.Net.Mime;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Forms;
@@ -12,10 +14,7 @@ using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using PcInputX;
-using Clipboard = System.Windows.Clipboard;
 using MenuItem = System.Windows.Forms.MenuItem;
-
-//using PcInputX;
 
 namespace MultiBuffer
 {
@@ -41,6 +40,8 @@ namespace MultiBuffer
         public MainWindow()
         {
             InitializeComponent();
+
+            var keyLocker = new KeyLocker();
 
             NotifyIcon.Icon = Properties.Resources.ClipIcon;
             NotifyIcon.ContextMenu = new System.Windows.Forms.ContextMenu(new[]
@@ -158,8 +159,14 @@ namespace MultiBuffer
                 case Keys.V:
                     var isVDownNow = e.EventType == WM.KEYDOWN;
 
+                    if (_isCtrlDown && _isShiftDown && !_isVDown && isVDownNow)
+                        e.StopEventPropagation = Properties.Settings.Default.StopEventPropagation;
+
                     if (_isCtrlDown && _isShiftDown && _isVDown && !isVDownNow)
+                    {
                         CtrlShiftVKeyUp();
+                        e.StopEventPropagation = Properties.Settings.Default.StopEventPropagation;
+                    }
 
                     _isVDown = isVDownNow;
                     break;
@@ -181,92 +188,119 @@ namespace MultiBuffer
         {
             ListView.Items.Add(ClipboardData.ExtractClipboardData());
         }
-
-        //        private void KeyboardXOnKeyboardEvent(object sender, KeyboardXEvent keyboardXEvent)
-        //        {
-        //            
-        //        }
     }
 
-    public abstract class ClipboardData
+    public class KeyLocker
     {
-        public ClipboardDataType DataType { get; protected set; }
-
-        public static ClipboardData ExtractClipboardData()
+        public bool NeedLock
         {
-            if (Clipboard.ContainsText())
+            get { return _needLock; }
+            private set
             {
-                return new ClipboardTextData(Clipboard.GetText());
+                _needLock = value;
+                NeedLockChanged();
+            }
+        }
+
+        private List<KeyboardXEvent> _pressedKeys = new List<KeyboardXEvent>();
+        private bool _needLock;
+
+        private readonly BackgroundWorker _worker;
+
+        public KeyLocker()
+        {
+            KeyboardX.Hook();
+            KeyboardX.KeyboardEvent += KeyboardXOnKeyboardEvent;
+
+            _worker = new BackgroundWorker();
+            _worker.DoWork += WorkerOnDoWork;
+            _worker.WorkerSupportsCancellation = true;
+
+            NeedLock = KeyboardX.IsScrollLockEnabled;
+        }
+
+        private void WorkerOnDoWork(object o, DoWorkEventArgs e)
+        {
+            var worker = o as BackgroundWorker;
+
+            var events = e.Argument as KeyboardXEvent[];
+            if (events == null) return;
+
+            while (true)
+            {
+                if (worker != null && worker.CancellationPending) break;
+
+                foreach (var xEvent in events)
+                    xEvent.InjectNow();
+
+                Thread.Sleep(10);
             }
 
-            if (Clipboard.ContainsAudio())
+            Console.WriteLine("Worker STOPING");
+
+            foreach (var xEvent in events)
             {
-                return new ClipboardAudioData(Clipboard.GetAudioStream());
+                xEvent.EventType = WM.KEYUP;
+                xEvent.InjectNow();
             }
 
-            if (Clipboard.ContainsImage())
+            Console.WriteLine("Worker STOPED");
+        }
+
+        private void KeyboardXOnKeyboardEvent(object o, KeyboardXEvent e)
+        {
+            if (e.Key == Keys.Scroll && e.EventType == WM.KEYUP)
             {
-                return new ClipboardImageData(Clipboard.GetImage());
+                NeedLock = !NeedLock;
+                return;
             }
 
-            if (Clipboard.ContainsFileDropList())
+            if (!NeedLock)
             {
-                var arr = new string[Clipboard.GetFileDropList().Count];
-                Clipboard.GetFileDropList().CopyTo(arr, 0);
-                return new ClipboardFileDropListData(arr);
+                switch (e.EventType)
+                {
+                    case WM.KEYDOWN:
+                        _pressedKeys.Add(e);
+                        break;
+
+                    case WM.KEYUP:
+                        var _e = _pressedKeys.FirstOrDefault(t => t.Key == e.Key);
+                        if (_e != null)
+                            _pressedKeys.Remove(_e);
+                        break;
+                }
             }
-
-            throw new Exception("UnSupport Clipboard data type");
+            else
+            {
+                if (e.EventFlags != KeyboardX.KbdllhookstructFlags.LLKHF_INJECTED)
+                    e.StopEventPropagation = true;
+            }
         }
 
-        public enum ClipboardDataType
+        private void NeedLockChanged()
         {
-            Text, Audio, Image, FileDropList
+            if (NeedLock)
+            {
+                if (!_worker.IsBusy)
+                {
+                    var events = new KeyboardXEvent[_pressedKeys.Count];
+                    _pressedKeys.CopyTo(events);
+
+                    Console.WriteLine("Worker RUN");
+                    foreach (var xEvent in events)
+                        Console.WriteLine($"EVENT {xEvent}");
+
+                    _worker.RunWorkerAsync(events);
+                }
+            }
+            else
+            {
+                if (_worker.IsBusy)
+                {
+                    Console.WriteLine("Worker STOPING");
+                    _worker.CancelAsync();
+                }
+            }
         }
     }
-
-    public class ClipboardTextData : ClipboardData
-    {
-        public string TextData { get; }
-
-        protected internal ClipboardTextData(string textData)
-        {
-            TextData = textData;
-            DataType = ClipboardDataType.Text;
-        }
-    }
-
-    public class ClipboardAudioData : ClipboardData
-    {
-        public Stream AudioStream { get; }
-
-        protected internal ClipboardAudioData(Stream audioStream)
-        {
-            AudioStream = audioStream;
-            DataType = ClipboardDataType.Audio;
-        }
-    }
-
-    public class ClipboardImageData : ClipboardData
-    {
-        public BitmapSource ImageData { get; }
-
-        protected internal ClipboardImageData(BitmapSource imageData)
-        {
-            ImageData = imageData;
-            DataType = ClipboardDataType.Image;
-        }
-    }
-
-    public class ClipboardFileDropListData : ClipboardData
-    {
-        public IEnumerable<string> FileDropList { get; }
-
-        protected internal ClipboardFileDropListData(IEnumerable<string> fileDropList)
-        {
-            FileDropList = fileDropList;
-            DataType = ClipboardDataType.Image;
-        }
-    }
-
 }

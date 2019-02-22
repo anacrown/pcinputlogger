@@ -9,6 +9,8 @@ namespace PcInputX
 
         public abstract TEvent ToTransferData();
 
+        public abstract void InjectNow();
+
         public abstract void Inject(DateTime starTime);
 
         public static XEvent FromTransferData(TEvent tEvent)
