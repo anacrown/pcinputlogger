@@ -41,7 +41,7 @@ namespace MultiBuffer
         {
             InitializeComponent();
 
-            var keyLocker = new KeyLocker();
+            KeyLocker.Init();
 
             NotifyIcon.Icon = Properties.Resources.ClipIcon;
             NotifyIcon.ContextMenu = new System.Windows.Forms.ContextMenu(new[]
@@ -91,6 +91,8 @@ namespace MultiBuffer
         {
             if (e.Cancel = _isCancel)
                 HideWindow();
+
+            KeyboardX.UnHook();
         }
 
         protected override void OnSourceInitialized(EventArgs e)
@@ -190,11 +192,11 @@ namespace MultiBuffer
         }
     }
 
-    public class KeyLocker
+    public static class KeyLocker
     {
-        public bool NeedLock
+        public static bool NeedLock
         {
-            get { return _needLock; }
+            get => _needLock;
             private set
             {
                 _needLock = value;
@@ -202,12 +204,12 @@ namespace MultiBuffer
             }
         }
 
-        private List<KeyboardXEvent> _pressedKeys = new List<KeyboardXEvent>();
-        private bool _needLock;
+        private static Dictionary<Keys, KeyboardXEvent> _pressedKeys = new Dictionary<Keys, KeyboardXEvent>();
+        private static bool _needLock;
 
-        private readonly BackgroundWorker _worker;
+        private static BackgroundWorker _worker;
 
-        public KeyLocker()
+        public static void Init()
         {
             KeyboardX.Hook();
             KeyboardX.KeyboardEvent += KeyboardXOnKeyboardEvent;
@@ -219,7 +221,7 @@ namespace MultiBuffer
             NeedLock = KeyboardX.IsScrollLockEnabled;
         }
 
-        private void WorkerOnDoWork(object o, DoWorkEventArgs e)
+        private static void WorkerOnDoWork(object o, DoWorkEventArgs e)
         {
             var worker = o as BackgroundWorker;
 
@@ -233,7 +235,7 @@ namespace MultiBuffer
                 foreach (var xEvent in events)
                     xEvent.InjectNow();
 
-                Thread.Sleep(10);
+                Thread.Sleep(25);
             }
 
             Console.WriteLine("Worker STOPING");
@@ -247,11 +249,19 @@ namespace MultiBuffer
             Console.WriteLine("Worker STOPED");
         }
 
-        private void KeyboardXOnKeyboardEvent(object o, KeyboardXEvent e)
+        private static void KeyboardXOnKeyboardEvent(object o, KeyboardXEvent e)
         {
-            if (e.Key == Keys.Scroll && e.EventType == WM.KEYUP)
+            Console.WriteLine($@"Raise KeyboardEvent {e} NeedLock {NeedLock}");
+
+            if (e.Key == Keys.Scroll)
             {
+                e.StopEventPropagation = true;
+
+                if (e.EventType != WM.KEYUP) return;
+
                 NeedLock = !NeedLock;
+                Console.WriteLine($@"NeedLock = {NeedLock}");
+                
                 return;
             }
 
@@ -260,37 +270,34 @@ namespace MultiBuffer
                 switch (e.EventType)
                 {
                     case WM.KEYDOWN:
-                        _pressedKeys.Add(e);
+                        if (!_pressedKeys.ContainsKey(e.Key))
+                            _pressedKeys.Add(e.Key, e);
                         break;
 
                     case WM.KEYUP:
-                        var _e = _pressedKeys.FirstOrDefault(t => t.Key == e.Key);
-                        if (_e != null)
-                            _pressedKeys.Remove(_e);
+                        if (_pressedKeys.ContainsKey(e.Key))
+                            _pressedKeys.Remove(e.Key);
                         break;
                 }
             }
             else
             {
-                if (e.EventFlags != KeyboardX.KbdllhookstructFlags.LLKHF_INJECTED)
+                if (_pressedKeys.ContainsKey(e.Key) && e.EventFlags != KeyboardX.KbdllhookstructFlags.LLKHF_INJECTED)
                     e.StopEventPropagation = true;
             }
         }
 
-        private void NeedLockChanged()
+        private static void NeedLockChanged()
         {
             if (NeedLock)
             {
                 if (!_worker.IsBusy)
                 {
-                    var events = new KeyboardXEvent[_pressedKeys.Count];
-                    _pressedKeys.CopyTo(events);
-
                     Console.WriteLine("Worker RUN");
-                    foreach (var xEvent in events)
+                    foreach (var xEvent in _pressedKeys.Values)
                         Console.WriteLine($"EVENT {xEvent}");
 
-                    _worker.RunWorkerAsync(events);
+                    _worker.RunWorkerAsync(_pressedKeys.Values.ToArray());
                 }
             }
             else

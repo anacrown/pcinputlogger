@@ -117,8 +117,6 @@ namespace PcInputX
 
         public static void InjectNow(KeyboardXEvent xEvent)
         {
-            Console.WriteLine(xEvent);
-
             uint dwFlags = 0;
             if (xEvent.EventType == WM.KEYUP || xEvent.EventType == WM.SYSKEYUP)
                 dwFlags = 0x0002;
@@ -142,7 +140,7 @@ namespace PcInputX
             var keyboardXEvent = KeyboardXEvent.FromKbdllhookstruct(wParam, kbd);
 
 #if DEBUG
-            Console.WriteLine($@"Raise KeyboardEvent {keyboardXEvent}");
+            //Console.WriteLine($@"Raise KeyboardEvent {keyboardXEvent}");
 #endif
 
             KeyboardEvent?.Invoke(null, keyboardXEvent);
@@ -150,7 +148,7 @@ namespace PcInputX
             var res = keyboardXEvent.StopEventPropagation ? new IntPtr(1) : CallNextHookEx(nCode, nCode, (IntPtr)wParam, lParam);
 
 #if DEBUG
-            Console.WriteLine($@"Raise AfterKeyboardEvent {keyboardXEvent}");
+            //Console.WriteLine($@"Raise AfterKeyboardEvent {keyboardXEvent}");
 #endif
 
             AfterKeyboardEvent?.Invoke(null, keyboardXEvent);

@@ -129,8 +129,6 @@ namespace PcInputX
 
         public static void InjectNow(MouseXEvent xEvent)
         {
-            Console.WriteLine(xEvent);
-
             var dwFlags = WMToEventF(xEvent.EventType);
 
             SetCursorPos(xEvent.X, xEvent.Y);
