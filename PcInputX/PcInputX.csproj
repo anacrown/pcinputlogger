@@ -56,6 +56,7 @@
     <Compile Include="MouseX.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="SystemMetric.cs" />
+    <Compile Include="KeyBoardWatcher.cs" />
     <Compile Include="Wm.cs" />
     <Compile Include="XEvent.cs" />
   </ItemGroup>
