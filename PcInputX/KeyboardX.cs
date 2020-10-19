@@ -117,6 +117,8 @@ namespace PcInputX
 
         public static void InjectNow(KeyboardXEvent xEvent)
         {
+            Console.WriteLine($"Inject {xEvent}");
+
             uint dwFlags = 0;
             if (xEvent.EventType == WM.KEYUP || xEvent.EventType == WM.SYSKEYUP)
                 dwFlags = 0x0002;

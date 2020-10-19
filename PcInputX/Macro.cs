@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Security.Policy;
 using System.Windows.Forms;
 using System.Xml.Serialization;
 
@@ -79,6 +80,8 @@ namespace PcInputX
 
         public XEvent[] Events { get; }
 
+        public bool Cancel { get; set; } = false;
+
         protected Macro(XEvent[] events)
         {
             Events = events;
@@ -106,11 +109,23 @@ namespace PcInputX
             }
         }
 
-        public void XPlay()
+        public void XPlay(bool inLoop = false)
         {
+            Cancel = false;
+
             var startTime = DateTime.Now;
-            foreach (var xEvent in Events)
-                xEvent.Inject(startTime);
+            while (true)
+            {
+                foreach (var xEvent in Events)
+                {
+                    if (Cancel) break;
+
+                    xEvent.Inject(startTime);
+                }
+
+                if (!inLoop || Cancel)
+                    break;
+            }
         }
 
         private TMacro ToTransferData() => new TMacro

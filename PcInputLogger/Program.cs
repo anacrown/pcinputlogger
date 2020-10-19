@@ -1,4 +1,7 @@
 ﻿using System;
+using System.IO;
+using System.Threading;
+using System.Windows.Forms;
 using PcInputX;
 
 namespace PcInputLogger
@@ -14,7 +17,7 @@ namespace PcInputLogger
                 {
                     case 0: Record(); break;
                     case 1: Play(); break;
-                    case 2: PlayInLoop(); break;
+                    case 2: Play(true); break;
                     case 3: isExit = true; break;
                     default: throw new ArgumentOutOfRangeException();
                 }
@@ -62,23 +65,50 @@ namespace PcInputLogger
 
         static void Record()
         {
+            
+            var name = Console.ReadLine();
+
             var macro = Macro.Record();
-            macro.Save("../../Macro.xml");
+            macro.Save("../../../Macro.xml");
         }
 
-        static void Play()
+        static string ReadMecrosName()
         {
-            var macro = Macro.Load("../../Macro.xml");
-            macro.XPlay();
+            var name = string.Empty;
+
+            Console.Clear();
+            Console.ResetColor();
+            Console.Write($"Enter macros name: {name}");
+
+            try
+            {
+                var path = Path.Combine("../../..", $"{name}.macro");
+            }
+            catch (Exception e)
+            {
+                Console.BackgroundColor = ConsoleColor.Red;
+                Console.WriteLine(e);
+                throw;
+            }
+
+            return name;
+        }
+
+        static void Play(bool inLopp = false)
+        {
+            var macro = Macro.Load("../../../Macro.xml");
+
+            KeyboardX.Hook();
+            KeyboardX.KeyboardEvent += (o, e) =>
+            {
+                if (e.Key == Keys.Scroll && e.EventType == WM.KEYUP)
+                    macro.Cancel = true;
+            };
+            
+            macro.XPlay(inLopp);
 
             Console.WriteLine("Done.");
             Console.ReadKey();
-        }
-
-        static void PlayInLoop()
-        {
-            var macro = Macro.Load("../../Macro.xml");
-            while (true) macro.XPlay();
         }
     }
 }

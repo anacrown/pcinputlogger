@@ -8,6 +8,8 @@
         public static int Record = 0;
         public static int Play = 1;
         public static int PlayInLoop = 2;
+
+        // Обязательно последний элемент
         public static int Exit = 3;
 
         private MenuPoint(int value)
@@ -35,7 +37,7 @@
 
         public static MenuPoint operator--(MenuPoint menuPoint)
         {
-            menuPoint.Value = (menuPoint.Value - 1) % Exit;
+            menuPoint.Value = (menuPoint.Value + Exit - 1) % Exit;
             return menuPoint;
         }
     }
